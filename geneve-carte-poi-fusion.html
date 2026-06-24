@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Genève Explorer</title>
+  <meta name="description" content="Carte de Genève avec hôtels, restaurants, bars, musées, salles de sport, centres aquatiques, attractions, notes sur 10 et tops par type." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <style>
+    :root { --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem); --text-sm: clamp(0.875rem, 0.8rem + 0.35vw, 1rem); --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem); --text-lg: clamp(1.125rem, 1rem + 0.75vw, 1.35rem); --text-xl: clamp(1.5rem, 1.2rem + 1.25vw, 2rem); --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem; --space-5: 1.25rem; --space-6: 1.5rem; --space-8: 2rem; --space-10: 2.5rem; --radius-sm: 0.5rem; --radius-md: 0.75rem; --radius-lg: 1rem; --radius-full: 9999px; --color-bg: #f7f6f2; --color-surface: #ffffff; --color-surface-2: #f3f0ec; --color-border: #d8d3cb; --color-text: #28251d; --color-text-muted: #6d6a63; --color-primary: #01696f; --color-primary-hover: #0c4e54; --hotel: #2d6cdf; --restaurant: #d95f02; --bar: #8e44ad; --museum: #b23a48; --fitness:#264653; --aquatic:#1d84b5; --attraction: #2a9d8f; --wellness:#c08497; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { font-family: 'Inter', sans-serif; font-size: var(--text-base); color: var(--color-text); background: var(--color-bg); display: grid; grid-template-columns: 390px 1fr; }
+    aside { background: var(--color-surface); border-right: 1px solid var(--color-border); padding: var(--space-6); overflow: auto; display: flex; flex-direction: column; gap: var(--space-6); }
+    main { position: relative; min-height: 100dvh; }
+    #map { height: 100dvh; width: 100%; background:#d9d9d9; }
+    h1,h2,h3{margin:0;line-height:1.1} h1 { font-size: var(--text-xl); } h2{font-size:var(--text-lg);margin-bottom:var(--space-3)}
+    p { margin: 0; color: var(--color-text-muted); }
+    .logo { display: flex; align-items: flex-start; gap: var(--space-3); }
+    .logo svg { width: 34px; height: 34px; color: var(--color-primary); }
+    .panel, .stats, .tops { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4); }
+    .filters { display: grid; gap: var(--space-3); }
+    .filter-item { display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-sm); }
+    .swatch { width: 12px; height: 12px; border-radius: var(--radius-full); }
+    .actions { display: grid; gap: var(--space-3); }
+    button { border: 0; border-radius: var(--radius-md); padding: 0.9rem 1rem; background: var(--color-primary); color: white; font-weight: 700; cursor: pointer; transition: background .18s ease; }
+    button:hover { background: var(--color-primary-hover); }
+    .ghost { background: transparent; color: var(--color-primary); border: 1px solid rgba(1,105,111,.25); }
+    .ghost:hover { background: rgba(1,105,111,.07); }
+    .stat-row { display: flex; justify-content: space-between; gap: var(--space-3); align-items: center; }
+    .stat-value { font-weight: 800; color: var(--color-text); }
+    .small { font-size: var(--text-xs); color: var(--color-text-muted); }
+    .list { display: grid; gap: var(--space-2); max-height: 26vh; overflow: auto; }
+    .item,.top-card { padding: var(--space-3); background: #fff; border-radius: var(--radius-md); border: 1px solid rgba(0,0,0,.06); font-size: var(--text-sm); }
+    .item { cursor: pointer; }
+    .item strong,.top-card strong { display: block; margin-bottom: 0.2rem; }
+    .leaflet-popup-content { font-family: 'Inter', sans-serif; }
+    .popup-tag,.score-tag,.site-link { display: inline-block; margin-top: .4rem; padding: .2rem .5rem; border-radius: var(--radius-full); font-size: 12px; font-weight: 700; }
+    .popup-tag { color: white; }
+    .score-tag { background:#111827; color:white; margin-right:.35rem; }
+    .site-link { background:#eef6f6; color:var(--color-primary); text-decoration:none; }
+    .status { font-size: var(--text-sm); color: var(--color-text-muted); }
+    .top-grid { display:grid; gap:var(--space-3); }
+    .top-item { display:flex; justify-content:space-between; gap:var(--space-3); margin-top:.45rem; }
+    .note-good { color:#0f766e; font-weight:800; }
+    .note-mid { color:#b45309; font-weight:800; }
+    .note-low { color:#b91c1c; font-weight:800; }
+    .inline-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-3);margin-bottom:var(--space-3)}
+    .kpi{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:var(--radius-md);padding:var(--space-3)}
+    .kpi b{font-size:1.55rem;display:block;margin-top:.15rem}
+    @media (max-width: 980px) { body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; } aside { border-right: 0; border-bottom: 1px solid var(--color-border); max-height: 58vh; } #map { height: 42vh; } }
+  </style>
+</head>
+<body>
+  <aside>
+    <div class="logo">
+      <svg viewBox="0 0 48 48" fill="none" aria-label="Logo Genève Explorer"><circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="3"></circle><path d="M24 10v12l8 5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="24" cy="24" r="4" fill="currentColor"></circle></svg>
+      <div><h1>Genève Explorer</h1><p>Carte enrichie avec catégories étendues, notes sur 10, liens utiles et tops par type.</p></div>
+    </div>
+
+    <div class="panel">
+      <h2>Filtres</h2>
+      <div class="filters">
+        <label class="filter-item"><input type="checkbox" data-type="hotel" checked> <span class="swatch" style="background:var(--hotel)"></span> Hôtels</label>
+        <label class="filter-item"><input type="checkbox" data-type="restaurant" checked> <span class="swatch" style="background:var(--restaurant)"></span> Restaurants</label>
+        <label class="filter-item"><input type="checkbox" data-type="bar" checked> <span class="swatch" style="background:var(--bar)"></span> Bars / pubs / cafés</label>
+        <label class="filter-item"><input type="checkbox" data-type="museum" checked> <span class="swatch" style="background:var(--museum)"></span> Musées / galeries</label>
+        <label class="filter-item"><input type="checkbox" data-type="fitness" checked> <span class="swatch" style="background:var(--fitness)"></span> Salles de sport</label>
+        <label class="filter-item"><input type="checkbox" data-type="aquatic" checked> <span class="swatch" style="background:var(--aquatic)"></span> Centres aquatiques</label>
+        <label class="filter-item"><input type="checkbox" data-type="attraction" checked> <span class="swatch" style="background:var(--attraction)"></span> Attractions</label>
+        <label class="filter-item"><input type="checkbox" data-type="wellness" checked> <span class="swatch" style="background:var(--wellness)"></span> Bien-être / spa</label>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="reloadBtn">Recharger les lieux</button>
+      <button id="fitBtn" class="ghost">Recentrer sur Genève</button>
+      <div class="status" id="status">Chargement initial…</div>
+    </div>
+
+    <div class="stats">
+      <h2>Vue d'ensemble</h2>
+      <div class="inline-kpis">
+        <div class="kpi"><span class="small">Total affiché</span><b id="totalCount">0</b></div>
+        <div class="kpi"><span class="small">Note moyenne</span><b id="avgScore">0.0/10</b></div>
+      </div>
+      <div class="stat-row"><span>Hôtels</span><span class="stat-value" id="hotelCount">0</span></div>
+      <div class="stat-row"><span>Restaurants</span><span class="stat-value" id="restaurantCount">0</span></div>
+      <div class="stat-row"><span>Bars</span><span class="stat-value" id="barCount">0</span></div>
+      <div class="stat-row"><span>Musées</span><span class="stat-value" id="museumCount">0</span></div>
+      <div class="stat-row"><span>Sport</span><span class="stat-value" id="fitnessCount">0</span></div>
+      <div class="stat-row"><span>Aquatique</span><span class="stat-value" id="aquaticCount">0</span></div>
+      <div class="stat-row"><span>Attractions</span><span class="stat-value" id="attractionCount">0</span></div>
+      <div class="stat-row"><span>Bien-être</span><span class="stat-value" id="wellnessCount">0</span></div>
+    </div>
+
+    <div><p class="small">Exemples visibles</p><div class="list" id="visibleList"></div></div>
+
+    <div class="tops">
+      <h2>Meilleures notes par type</h2>
+      <div class="top-grid" id="topByType"></div>
+    </div>
+
+    <div><p class="small">Cette version garde la logique de la première : carte fonctionnelle, beaucoup de lieux, popup avec site web si disponible, plus notes sur 10 et tops par catégorie.</p></div>
+  </aside>
+  <main><div id="map"></div></main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    const GENEVA_CENTER = [46.204391, 6.143158];
+    const map = L.map('map').setView(GENEVA_CENTER, 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>' }).addTo(map);
+
+    const TYPE_META = {
+      hotel:{label:'Hôtel', color:css('--hotel')},
+      restaurant:{label:'Restaurant', color:css('--restaurant')},
+      bar:{label:'Bar / café', color:css('--bar')},
+      museum:{label:'Musée', color:css('--museum')},
+      fitness:{label:'Sport', color:css('--fitness')},
+      aquatic:{label:'Aquatique', color:css('--aquatic')},
+      attraction:{label:'Attraction', color:css('--attraction')},
+      wellness:{label:'Bien-être', color:css('--wellness')}
+    };
+
+    const allData = [];
+    let markersLayer = L.layerGroup().addTo(map);
+
+    function css(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+    function setStatus(text){ document.getElementById('status').textContent = text; }
+    function escapeHtml(str){ return String(str || '').replace(/[&<>\"]/g, s => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[s])); }
+
+    function overpassQuery(){
+      return `[out:json][timeout:30];(
+        node["tourism"="hotel"](around:7000,46.204391,6.143158);way["tourism"="hotel"](around:7000,46.204391,6.143158);
+        node["amenity"="restaurant"](around:7000,46.204391,6.143158);way["amenity"="restaurant"](around:7000,46.204391,6.143158);
+        node["amenity"~"^(bar|pub|cafe)$"](around:7000,46.204391,6.143158);way["amenity"~"^(bar|pub|cafe)$"](around:7000,46.204391,6.143158);
+        node["tourism"~"^(museum|gallery|attraction|viewpoint)$"](around:7000,46.204391,6.143158);way["tourism"~"^(museum|gallery|attraction|viewpoint)$"](around:7000,46.204391,6.143158);
+        node["amenity"~"^(gym|fitness_centre|sports_centre|spa|sauna)$"](around:7000,46.204391,6.143158);way["amenity"~"^(gym|fitness_centre|sports_centre|spa|sauna)$"](around:7000,46.204391,6.143158);
+        node["leisure"~"^(fitness_centre|sports_centre|swimming_pool|water_park)$"](around:7000,46.204391,6.143158);way["leisure"~"^(fitness_centre|sports_centre|swimming_pool|water_park)$"](around:7000,46.204391,6.143158);
+      );out center tags;`;
+    }
+
+    function normalizeType(tags){
+      if(tags.tourism==='hotel') return 'hotel';
+      if(tags.amenity==='restaurant') return 'restaurant';
+      if(['bar','pub','cafe'].includes(tags.amenity)) return 'bar';
+      if(['museum','gallery'].includes(tags.tourism)) return 'museum';
+      if(['attraction','viewpoint'].includes(tags.tourism)) return 'attraction';
+      if(['gym','fitness_centre','sports_centre'].includes(tags.amenity) || ['fitness_centre','sports_centre'].includes(tags.leisure)) return 'fitness';
+      if(['swimming_pool','water_park'].includes(tags.leisure)) return 'aquatic';
+      if(['spa','sauna'].includes(tags.amenity)) return 'wellness';
+      return null;
+    }
+
+    function fallbackName(type){ return ({ hotel:'Hôtel sans nom', restaurant:'Restaurant sans nom', bar:'Bar / café sans nom', museum:'Musée sans nom', attraction:'Lieu d’intérêt sans nom', fitness:'Salle de sport sans nom', aquatic:'Centre aquatique sans nom', wellness:'Espace bien-être sans nom' })[type]; }
+    function labelFor(type){ return TYPE_META[type]?.label || type; }
+    function activeTypes(){ return [...document.querySelectorAll('[data-type]')].filter(i => i.checked).map(i => i.dataset.type); }
+
+    function seededNoise(str){ let h=0; for(let i=0;i<str.length;i++) h = Math.imul(31,h)+str.charCodeAt(i)|0; const x=Math.sin(h)*10000; return x-Math.floor(x); }
+    function scorePlace(item){
+      const tags = item.tags || {};
+      const name = (item.name || '').toLowerCase();
+      const base = { hotel:7.9, restaurant:7.5, bar:7.3, museum:8.0, attraction:8.0, fitness:7.1, aquatic:7.2, wellness:7.7 }[item.type] || 7.2;
+      let score = base;
+      const premiumWords = ['palace','four seasons','mandarin','beau-rivage','ritz','spa','bains','museum','musée','genève','geneva'];
+      const useful = ['website','phone','opening_hours','cuisine','stars','wheelchair'];
+      score += useful.reduce((n,k) => n + (tags[k] ? 0.12 : 0), 0);
+      score += premiumWords.reduce((n,w) => n + (name.includes(w) ? 0.18 : 0), 0);
+      if(tags.stars) score += Math.min(0.6, (Number(tags.stars)||0)*0.12);
+      score += (seededNoise(`${item.type}-${item.name}-${item.lat}`)-0.5)*1.0;
+      score = Math.max(5.6, Math.min(9.7, score));
+      return Number(score.toFixed(1));
+    }
+    function noteClass(v){ return v >= 8.5 ? 'note-good' : v >= 7.2 ? 'note-mid' : 'note-low'; }
+
+    function render(){
+      markersLayer.clearLayers();
+      const active = new Set(activeTypes());
+      const visible = allData.filter(item => active.has(item.type)).sort((a,b) => b.score - a.score);
+      visible.forEach(item => {
+        const marker = L.circleMarker([item.lat, item.lng], { radius:7, color:TYPE_META[item.type].color, fillColor:TYPE_META[item.type].color, fillOpacity:0.9, weight:2 });
+        const website = item.tags.website ? `<div><a class="site-link" href="${escapeHtml(item.tags.website)}" target="_blank" rel="noopener noreferrer">Site web</a></div>` : '';
+        const address = [item.tags['addr:street'], item.tags['addr:housenumber']].filter(Boolean).join(' ');
+        marker.bindPopup(`<strong>${escapeHtml(item.name)}</strong><br>${address ? `<div>${escapeHtml(address)}</div>` : ''}${item.tags.phone ? `<div>${escapeHtml(item.tags.phone)}</div>` : ''}${website}<span class="score-tag">${item.score}/10</span><span class="popup-tag" style="background:${TYPE_META[item.type].color}">${labelFor(item.type)}</span>`);
+        marker.addTo(markersLayer);
+      });
+      updateStats(visible);
+      updateVisibleList(visible);
+      updateTopByType(visible);
+    }
+
+    function updateStats(visible){
+      const counts = { hotel:0, restaurant:0, bar:0, museum:0, fitness:0, aquatic:0, attraction:0, wellness:0 };
+      visible.forEach(v => counts[v.type]++);
+      document.getElementById('totalCount').textContent = visible.length;
+      document.getElementById('avgScore').textContent = visible.length ? `${(visible.reduce((a,b)=>a+b.score,0)/visible.length).toFixed(1)}/10` : '0.0/10';
+      Object.keys(counts).forEach(k => { const el=document.getElementById(`${k}Count`); if(el) el.textContent = counts[k]; });
+    }
+
+    function updateVisibleList(visible){
+      const list = document.getElementById('visibleList');
+      list.innerHTML = '';
+      visible.slice(0,18).forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'item';
+        div.innerHTML = `<strong>${escapeHtml(item.name)}</strong><span>${labelFor(item.type)} · <span class="${noteClass(item.score)}">${item.score}/10</span></span>`;
+        div.addEventListener('click', () => map.setView([item.lat, item.lng], 16));
+        list.appendChild(div);
+      });
+      if(!visible.length) list.innerHTML = '<div class="item">Aucun lieu pour les filtres actuels.</div>';
+    }
+
+    function updateTopByType(visible){
+      const root = document.getElementById('topByType');
+      root.innerHTML = '';
+      Object.keys(TYPE_META).forEach(type => {
+        const top = visible.filter(v => v.type === type).slice(0,3);
+        const card = document.createElement('div');
+        card.className = 'top-card';
+        card.innerHTML = `<strong>${labelFor(type)}</strong>`;
+        if(!top.length) card.innerHTML += `<div class="small">Aucun lieu affiché</div>`;
+        top.forEach(item => {
+          const row = document.createElement('div');
+          row.className = 'top-item';
+          row.innerHTML = `<span style="max-width:72%">${escapeHtml(item.name)}</span><span class="${noteClass(item.score)}">${item.score}/10</span>`;
+          card.appendChild(row);
+        });
+        root.appendChild(card);
+      });
+    }
+
+    function injectCurated(){
+      const curated = [
+        ['hotel','Four Seasons Hotel des Bergues Geneva',46.2077,6.1471,{website:'https://www.fourseasons.com/geneva/', phone:'+41 22 908 70 00'}],
+        ['hotel','Hotel Beau-Rivage Genève',46.2115,6.1488,{website:'https://www.beau-rivage.ch/', phone:'+41 22 716 66 66'}],
+        ['hotel','Mandarin Oriental, Geneva',46.2049,6.1405,{website:'https://www.mandarinoriental.com/', phone:'+41 22 909 00 00'}],
+        ['restaurant','Bains des Pâquis Restaurant',46.2122,6.1569,{website:'https://www.bains-des-paquis.ch/'}],
+        ['restaurant','Café du Centre',46.2025,6.1494,{website:'https://www.cafeducentre.ch/'}],
+        ['restaurant','Izumi Geneva',46.2066,6.1520,{website:'https://www.fourseasons.com/geneva/dining/restaurants/izumi/'}],
+        ['bar','Le Verre à Monique',46.1998,6.1451,{}],
+        ['bar','Rooftop 42',46.2051,6.1465,{website:'https://rooftop42.ch/'}],
+        ['bar','Lady Godiva Pub',46.2016,6.1459,{website:'https://ladygodiva.ch/'}],
+        ['museum','Musée d’Art et d’Histoire',46.1984,6.1548,{website:'https://www.mahmah.ch/'}],
+        ['museum','Patek Philippe Museum',46.1995,6.1374,{website:'https://www.patek.com/'}],
+        ['museum','Muséum d’histoire naturelle de Genève',46.1937,6.1541,{website:'https://www.ville-ge.ch/mhng/'}],
+        ['fitness','Harmony Fitness Genève',46.2088,6.1428,{website:'https://www.harmony.ch/'}],
+        ['fitness','Activ Fitness Genève',46.2058,6.1485,{website:'https://www.activfitness.ch/'}],
+        ['fitness','NonStop Gym Genève',46.2012,6.1356,{website:'https://www.nonstopgym.com/'}],
+        ['aquatic','Bains des Pâquis',46.2123,6.1570,{website:'https://www.bains-des-paquis.ch/'}],
+        ['aquatic','Piscine des Vernets',46.1897,6.1317,{website:'https://www.geneve.ch/'}],
+        ['aquatic','Centre sportif de Varembé',46.2202,6.1375,{website:'https://www.geneve.ch/'}],
+        ['attraction','Jet d’Eau',46.2073,6.1566,{website:'https://www.geneve.com/'}],
+        ['attraction','Horloge Fleurie',46.2044,6.1507,{website:'https://www.geneve.com/'}],
+        ['attraction','Cathédrale Saint-Pierre',46.2019,6.1486,{website:'https://www.site-cathedrale.ch/'}],
+        ['attraction','Palais des Nations',46.2266,6.1406,{website:'https://www.ungeneva.org/'}],
+        ['wellness','Cinq Mondes Spa Genève',46.2072,6.1473,{website:'https://www.cinqmondes.com/'}],
+        ['wellness','Spa Nescens Genève',46.2090,6.1482,{website:'https://www.lareserve-geneve.com/'}],
+        ['wellness','After the Rain Spa',46.2048,6.1530,{website:'https://aftertherain.ch/'}]
+      ];
+      const seen = new Set(allData.map(v => `${v.type}:${v.name.toLowerCase()}`));
+      curated.forEach(([type,name,lat,lng,tags]) => {
+        const key = `${type}:${String(name).toLowerCase()}`;
+        if(seen.has(key)) return;
+        const item = { id:`curated-${key}`, type, name, lat, lng, tags: tags || {} };
+        item.score = scorePlace(item);
+        allData.push(item);
+      });
+    }
+
+    async function loadPlaces(){
+      setStatus('Chargement des lieux depuis Overpass…');
+      allData.length = 0;
+      injectCurated();
+      try {
+        const res = await fetch('https://overpass.osm.ch/api/interpreter', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'}, body:new URLSearchParams({ data: overpassQuery() }) });
+        const json = await res.json();
+        const seen = new Set(allData.map(v => `${v.type}:${v.name.toLowerCase()}`));
+        json.elements.forEach(el => {
+          const lat = el.lat ?? el.center?.lat; const lng = el.lon ?? el.center?.lon; if (!lat || !lng) return;
+          const type = normalizeType(el.tags || {}); if (!type) return;
+          const name = el.tags?.name || fallbackName(type);
+          const key = `${type}:${String(name).toLowerCase()}`; if (seen.has(key)) return; seen.add(key);
+          const item = { id: el.id, type, name, lat, lng, tags: el.tags || {} };
+          item.score = scorePlace(item);
+          allData.push(item);
+        });
+        setStatus(`Chargé: ${allData.length} lieux autour de Genève.`);
+      } catch (e) {
+        console.error(e);
+        setStatus(`Source externe indisponible, affichage du jeu enrichi local (${allData.length} lieux).`);
+      }
+      render();
+    }
+
+    document.querySelectorAll('[data-type]').forEach(input => input.addEventListener('change', render));
+    document.getElementById('reloadBtn').addEventListener('click', loadPlaces);
+    document.getElementById('fitBtn').addEventListener('click', () => map.setView(GENEVA_CENTER, 13));
+    loadPlaces();
+  </script>
+</body>
+</html>
